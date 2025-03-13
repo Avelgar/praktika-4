@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админка товаров</title>
+</head>
+<body>
+    <h1>Управление товарами</h1>
+
+    <h2>Добавить товар</h2>
+    <form id="addProductForm">
+        <div id="productFields">
+            <div class="product">
+                <input type="text" class="productName" placeholder="Название товара" required>
+                <input type="number" class="productPrice" placeholder="Цена товара" required>
+                <textarea class="productDescription" placeholder="Описание товара" required></textarea>
+                <input type="text" class="categories" placeholder="Введите категории через запятую">                          
+                <button type="button" class="removeProduct">Удалить</button>
+            </div>
+        </div>
+        <button type="button" id="addMoreProducts">Добавить еще товар</button>
+        <button type="submit">Добавить товары</button>
+    </form>
+
+    <h2>Редактировать товар</h2>
+    <form id="editProductForm">
+        <input type="number" id="id" placeholder="ID товара" required>
+        <input type="text" id="name2" placeholder="Новое название товара" required>
+        <input type="number" id="price2" placeholder="Новая цена товара" required>
+        <textarea id="description2" placeholder="Новое описание товара" required></textarea>
+        <input type="text" id="categories2" placeholder="Новые категории (через запятую)" required>
+        <button type="submit">Редактировать товар</button>
+    </form>
+
+    <h2>Удалить товар</h2>
+    <form id="deleteProductForm">
+        <input type="number" id="id2" placeholder="ID товара" required>
+        <button type="submit">Удалить товар</button>
+    </form>
+
+    <h2>Чат поддержки</h2>
+    <div id="chatBox" style="border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: scroll;"></div>
+    <input type="text" id="chatMessage" placeholder="Введите сообщение" />
+    <button id="sendMessage">Отправить</button>
+
+    <script>
+         document.getElementById('addProductForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const products = [];
+            const productElements = document.querySelectorAll('.product');
+
+            productElements.forEach(product => {
+                const name = product.querySelector('.productName').value;
+                const price = parseFloat(product.querySelector('.productPrice').value);
+                const description = product.querySelector('.productDescription').value;
+                const categoriesInput = product.querySelector('.categories').value;
+
+                const categories = categoriesInput.split(',').map(category => category.trim());
+
+                const newProduct = {
+                    name: name,
+                    price: price,
+                    description: description,
+                    categories: categories 
+                };
+
+                products.push(newProduct);
+            });
+
+            fetch('/api/products', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(products),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Успех:', data);
+                alert('Товары добавлены успешно!');
+                document.getElementById('addProductForm').reset();
+            })
+            .catch((error) => {
+                console.error('Ошибка:', error);
+                alert('Произошла ошибка при добавлении товаров.');
+            });
+        });
+
+        document.getElementById('addMoreProducts').addEventListener('click', function() {
+            const newProduct = document.createElement('div');
+            newProduct.classList.add('product');
+            newProduct.innerHTML = `
+                <input type="text" class="productName" placeholder="Название товара" required>
+                <input type="number" class="productPrice" placeholder="Цена товара" required>
+                <textarea class="productDescription" placeholder="Описание товара" required></textarea>
+                <input type="text" class="categories" placeholder="Категории (через запятую)" required>
+                <button type="button" class="removeProduct">Удалить</button>
+            `;
+            document.getElementById('productFields').appendChild(newProduct);
+        });
+
+        document.getElementById('productFields').addEventListener('click', function(event) {
+            if (event.target.classList.contains('removeProduct')) {
+                event.target.parentElement.remove();
+            }
+        });
+
+        document.getElementById('editProductForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const id = document.getElementById('id').value;
+            const name = document.getElementById('name2').value;
+            const price = parseFloat(document.getElementById('price2').value);
+            const description = document.getElementById('description2').value;
+            const categories = document.getElementById('categories2').value;
+
+            fetch(`/api/products/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name, price, description, categories }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Успех:', data);
+                alert('Товар отредактирован успешно!');
+                document.getElementById('editProductForm').reset();
+            })
+            .catch((error) => {
+                console.error('Ошибка:', error);
+                alert('Произошла ошибка при редактировании товара.');
+            });
+        });
+
+        document.getElementById('deleteProductForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const id = document.getElementById('id2').value;
+
+            fetch(`/api/products/${id}`, {
+            method: 'DELETE',
+            })
+            .then(() => {
+                alert('Товар удален успешно!');
+                document.getElementById('deleteProductForm').reset();
+            })
+            .catch((error) => {
+                console.error('Ошибка:', error);
+                alert('Произошла ошибка при удалении товара.');
+            });
+        });
+
+        const socket = new WebSocket('ws://localhost:3000');
+
+        socket.onmessage = function(event) {
+            try {
+                const message = JSON.parse(event.data); // Попробуйте распарсить сообщение
+                const chatBox = document.getElementById('chatBox');
+                chatBox.innerHTML += `<p><strong>${message.user}:</strong> ${message.text}</p>`;
+                chatBox.scrollTop = chatBox.scrollHeight; // Прокрутка вниз
+            } catch (error) {
+                console.error('Ошибка при обработке сообщения:', error);
+            }
+        };
+
+        document.getElementById('sendMessage').onclick = function() {
+            const messageInput = document.getElementById('chatMessage');
+            const message = {
+                user: 'Администратор',
+                text: messageInput.value
+            };
+            sendMessage(message);
+            messageInput.value = ''; // Очистка поля ввода
+        };
+
+        function sendMessage(message) {
+            socket.send(JSON.stringify(message)); // Отправляем сообщение в формате JSON
+        }
+    </script>
+</body>
+</html>
